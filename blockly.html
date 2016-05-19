@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MOOC Blockly</title>
+
+  <!-- Stylesheet links -->
+  <link rel="stylesheet" href="css/blockly-style.css">
+
+  <!-- JavaScript links -->
+  <script src="js/blockly_compressed.js"></script>
+  <script src="js/blocks_compressed.js"></script>
+  <script src="js/msg/js/en.js"></script>
+
+  <script src="js/acorn_interpreter.js"></script>
+  <script src="js/javascript_compressed.js"></script>
+
+</head>
+<body>
+
+  <div id="blocklyDiv" style="height: 80%; width: 100%;"></div>
+
+  <xml id="toolbox" style="display: none">
+    <category name="Blocchi">
+      <block type="esegui"></block>
+      <block type="fine"></block>
+      <block type="vai_avanti"></block>
+      <block type="girati_sx"></block>
+      <block type="girati_dx"></block>
+      <block type="controls_if"></block>
+      <block type="ripeti_finche"></block>
+      <block type="ripeti_fino_a"></block>
+      <block type="ripeti"></block>
+      <block type="evento"></block>
+    </category>
+    <category name="Variabili" custom="VARIABLE"></category>
+    <category name="Funzioni" custom="PROCEDURE"></category>
+  </xml>
+
+  <script>
+    var workspace = Blockly.inject('blocklyDiv', {media: 'media/', toolbox: document.getElementById('toolbox')});
+
+    var myInterpreter = null;
+
+    function initApi(interpreter, scope) {
+      // Add an API function for the alert() block.
+      var wrapper = function(text) {
+        text = text ? text.toString() : '';
+        return interpreter.createPrimitive(alert(text));
+      };
+      interpreter.setProperty(scope, 'alert',
+              interpreter.createNativeFunction(wrapper));
+
+      // Add an API function for the prompt() block.
+      var wrapper = function(text) {
+        text = text ? text.toString() : '';
+        return interpreter.createPrimitive(prompt(text));
+      };
+      interpreter.setProperty(scope, 'prompt',
+              interpreter.createNativeFunction(wrapper));
+
+      // Add an API function for highlighting blocks.
+      var wrapper = function(id) {
+        id = id ? id.toString() : '';
+        return interpreter.createPrimitive(highlightBlock(id));
+      };
+      interpreter.setProperty(scope, 'highlightBlock',
+              interpreter.createNativeFunction(wrapper));
+    }
+
+    var highlightPause = false;
+
+    function highlightBlock(id) {
+      workspace.highlightBlock(id);
+      highlightPause = true;
+    }
+
+    function parseCode() {
+      // Generate JavaScript code and parse it.
+      Blockly.JavaScript.STATEMENT_PREFIX = 'highlightBlock(%1);\n';
+      Blockly.JavaScript.addReservedWords('highlightBlock');
+      var code = Blockly.JavaScript.workspaceToCode(workspace);
+      myInterpreter = new Interpreter(code, initApi);
+
+      document.getElementById('stepButton').disabled = '';
+      highlightPause = false;
+      workspace.traceOn(true);
+      //workspace.highlightBlock(null);
+      stepCode();
+    }
+
+    function stepCode() {
+      try {
+        var ok = myInterpreter.step();
+      } finally {
+        if (!ok) {
+          // Program complete, no more code to execute.
+          document.getElementById('stepButton').disabled = 'disabled';
+          return;
+        }
+      }
+      if (highlightPause) {
+        // A block has been highlighted.  Pause execution here.
+        highlightPause = false;
+      } else {
+        // Keep executing until a highlight statement is reached.
+        stepCode();
+      }
+    }
+
+    function discard(workspace) {
+      var count = workspace.getAllBlocks().length;
+      if (count < 2 ||
+              window.confirm(Blockly.Msg.DELETE_ALL_BLOCKS.replace('%1', count))) {
+        workspace.clear();
+        if (window.location.hash) {
+          window.location.hash = '';
+        }
+      }
+
+      function stop(workspace){
+        document.getElementById('stepButton').disabled = 'disabled';
+        workspace.highlightBlock(null);
+        workspace.traceOn(false);
+        myInterpreter.stopBlockIncrementing_();
+        myInterpreter.stop();
+      }
+    }
+  </script>
+
+  <button id="runButton" class="notext play" title="Run the program." onclick="parseCode()">
+    <img src="media/1x1.gif" class="run icon21">
+  </button>
+  <button id="stepButton" class="notext" disabled="disabled" title="Run the program." onclick="stepCode()">
+    <img src="media/1x1.gif" class="step icon21">
+  </button>
+  <!--<button id="stopButton" class="notext primary" title="Stop the program." onclick="stop(workspace)">
+    <img src="media/1x1.gif" class="stop icon21">
+  </button>-->
+  <button id="trashButton" class="notext trash" title="Discard all blocks." onclick="discard(workspace)">
+    <img src="media/1x1.gif" class="trash icon21">
+  </button>
+
+</body>
+</html>
